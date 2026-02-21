@@ -18,9 +18,16 @@ export const login = async (req, res, next) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) throw new Error("Invalid credentials");
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "30d",
-    });
+     const token = jwt.sign(
+          {
+            userId: user._id,
+            role: user.role,
+            tenantId: user.tenantId,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+        
     res.json({ msg:"Login Successful",success: true, token });
   } catch (err) {
     next(err);
@@ -36,7 +43,7 @@ export const assignLead = async (req, res, next) => {
     const employee = await User.findOne({
       _id: employeeId,
       tenantId: req.user.tenantId,
-      department: "Sales",
+      department: "sales",
     });
 
     if (!employee) {
