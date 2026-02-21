@@ -9,9 +9,9 @@ import User from '../users/user.model.js';
  */
 export const createUser = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role ,department} = req.body;
 
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !password || !role || !department) {
       throw new Error("All fields are required");
     }
 
@@ -29,6 +29,7 @@ export const createUser = async (req, res, next) => {
       email,
       password: hashedPassword,
       role,
+      department,
       status: "active",
     });
 
@@ -50,7 +51,7 @@ export const createUser = async (req, res, next) => {
 export const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, email, password, role, status } = req.body;
+    const { name, email, password, role, status,department } = req.body;
 
     // Build allowed update object
     const updateData = {};
@@ -69,6 +70,7 @@ export const updateUser = async (req, res, next) => {
     }
 
     if (status) updateData.status = status;
+    if (department) updateData.department = department;
 
     // Tenant-based condition
     const filter =
@@ -123,3 +125,39 @@ export const getUsers = async (req, res, next) => {
     next(err);
   }
 };
+
+
+// create super admin user (for testing, remove in production)
+export const createSuperAdmin = async (req,res,next)=>{
+  try {
+    const {name,email,password}= req.body;
+    const existingAdmin = await User.findOne({email: email});
+    if(existingAdmin){
+      return res.status(400).json({
+        success: false,
+        message: "Super Admin with this email already exists"
+      });
+    }
+    const hashedPassword = await bcrypt.hash(password,10);
+    const superAdmin = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: "super_admin",
+      status: "active"
+    });
+    res.status(201).json({
+      success: true,
+      message: "Super Admin created successfully",
+      data: {
+        id: superAdmin._id,
+        email: superAdmin.email,
+        role: superAdmin.role
+      }
+    });
+    
+  } catch (error) {
+    next(error);
+    
+  }
+}

@@ -24,6 +24,7 @@ export const login = async (req, res, next) => {
     if (!match) throw new Error("Invalid credentials");
 
     const otp = generateOTP();
+    console.log("Generated OTP for login:", otp);  // For testing, log the OTP to the console. Remove in production.
 
     await OTP.deleteMany({ email });
 

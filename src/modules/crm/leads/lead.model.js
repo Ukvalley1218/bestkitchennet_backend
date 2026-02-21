@@ -36,9 +36,19 @@ const leadSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    assignedDepartment: {
+  type: String,
+  default: "Sales"
+},
+leadStage: {
+  type: String,
+  enum: ["new","assigned","followup","retry","interested","closed"],
+  default: "new"
+},
 
     nextFollowUpDate: Date,
     remarks: String,
+    followUpDate:Date,
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

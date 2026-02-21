@@ -42,7 +42,7 @@ const userSchema = new mongoose.Schema(
         // Company Level
         "ceo",
         "admin",
-
+"sales",
         // Staff
         "manager",
         "employee",
@@ -54,7 +54,7 @@ const userSchema = new mongoose.Schema(
       ],
       required: true,
     },
-
+department: String,
     status: {
       type: String,
       enum: ["active", "inactive", "blocked"],

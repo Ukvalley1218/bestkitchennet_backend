@@ -39,7 +39,7 @@ const tenantSchema = new mongoose.Schema(
 
     trialEndsAt: {
       type: Date,
-    },
+    },  
 
     isDeleted: {
       type: Boolean,

@@ -13,6 +13,7 @@ import activityRoutes from './src/modules/crm/activities/activity.routes.js';
 import quotationRoutes  from './src/modules/crm/quotations/quotation.routes.js';
 import invoiceRoutes  from './src/modules/crm/invoices/invoice.routes.js';
 import dashboardRoutes  from './src/modules/crm/dashboard/dashboard.routes.js';
+import telecallingRoutes from "./src/modules/telecalling/telecalling.routes.js";
 
 
 dotenv.config();
@@ -35,6 +36,9 @@ app.use("/api/crm/activities",activityRoutes);
 app.use("/api/crm/quotations",quotationRoutes);
 app.use("/api/crm/invoices",invoiceRoutes);
 app.use("/api/crm/dashboard",dashboardRoutes);
+
+// router
+app.use("/api/telecalling",telecallingRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
