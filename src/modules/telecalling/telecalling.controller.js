@@ -27,8 +27,70 @@ export const login = async (req, res, next) => {
           process.env.JWT_SECRET,
           { expiresIn: "7d" }
         );
-        
+
     res.json({ msg:"Login Successful",success: true, token });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+
+/**
+ * SUMMARY
+ */
+export const summary = async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    const totalEmployees = await User.countDocuments({
+      tenantId,
+      department: "Sales",
+    });
+
+    const onCall = await CallLog.countDocuments({
+      tenantId,
+      isLive: true,
+    });
+
+    const activeEmployees = await CallLog.distinct("employeeId", {
+      tenantId,
+      createdAt: {
+        $gte: new Date(new Date().setHours(0, 0, 0, 0)),
+      },
+    });
+
+    const avgDuration = await CallLog.aggregate([
+      { $match: { tenantId } },
+      { $group: { _id: null, avg: { $avg: "$duration" } } },
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        totalEmployees,
+        onCall,
+        activeEmployees: activeEmployees.length,
+        avgCallDuration: avgDuration[0]?.avg || 0,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * LIVE CALLS
+ */
+export const liveCalls = async (req, res, next) => {
+  try {
+    const calls = await CallLog.find({
+      tenantId: req.user.tenantId,
+      isLive: true,
+    }).populate("employeeId leadId");
+
+    res.json({ success: true, data: calls });
   } catch (err) {
     next(err);
   }
@@ -150,4 +212,122 @@ const handleOutcome = async (call, user) => {
   }
 
   await lead.save();
+};
+
+export const updateMyLead = async (req, res, next) => {
+  try {
+    const { status, leadStage, followUpDate, remarks } = req.body;
+
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      assignedTo: req.user.id,
+    });
+
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found or not assigned to you",
+      });
+    }
+
+    // Only update allowed fields
+    if (status) lead.status = status;
+    if (leadStage) lead.leadStage = leadStage;
+    if (followUpDate) lead.followUpDate = followUpDate;
+    if (remarks) lead.remarks = remarks;
+
+    await lead.save();
+
+    res.json({
+      success: true,
+      data: lead,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+
+export const getMyAssignedLeads = async (req, res, next) => {
+  try {
+    const leads = await Lead.find({
+      tenantId: req.user.tenantId,
+      assignedTo: req.user.id,
+      leadStage: { $ne: "closed" },
+    })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.json({
+      success: true,
+      count: leads.length,
+      data: leads,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getMyFollowups = async (req, res, next) => {
+  try {
+    const today = new Date();
+
+    const leads = await Lead.find({
+      tenantId: req.user.tenantId,
+      assignedTo: req.user.id,
+      leadStage: "followup",
+      followUpDate: { $lte: today },
+    });
+
+    res.json({
+      success: true,
+      data: leads,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getMyRetryQueue = async (req, res, next) => {
+  try {
+    const retries = await RetryQueue.find({
+      tenantId: req.user.tenantId,
+      employeeId: req.user.id,
+      nextRetryAt: { $lte: new Date() },
+    }).populate("leadId");
+
+    res.json({
+      success: true,
+      data: retries,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getLeadDetails = async (req, res, next) => {
+  try {
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      assignedTo: req.user.id,
+    });
+
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: lead,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
