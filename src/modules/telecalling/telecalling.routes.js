@@ -9,7 +9,7 @@ import rbac from "../../middlewares/rbac.middleware.js";
 const router = Router();
 
 
-router.post("/login", auth, tenant, login);
+router.post("/login", login);
 router.post("/assign", auth, tenant, rbac(["sales"]),assignLead);
 router.post("/start-call", auth, tenant, startCall);
 router.post("/end-call", auth, tenant, endCall);
