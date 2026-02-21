@@ -30,6 +30,7 @@ const leadSchema = new mongoose.Schema(
       enum: ["new", "contacted", "quoted", "closed-won", "closed-lost"],
       default: "new",
     },
+    requirement: String,
 
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
