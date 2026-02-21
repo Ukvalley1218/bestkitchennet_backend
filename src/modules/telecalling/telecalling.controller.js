@@ -2,7 +2,30 @@ import Lead from "../crm/leads/lead.model.js";
 import User from "../users/user.model.js";
 import CallLog from "./callLog.model.js";
 import RetryQueue from "./retryQueue.model.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
+
+
+export const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) throw new Error("User not found");
+    if (user.status !== "active") throw new Error("User inactive");
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) throw new Error("Invalid credentials");
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "30d",
+    });
+    res.json({ msg:"Login Successful",success: true, token });
+  } catch (err) {
+    next(err);
+  }
+};
 /**
  * ASSIGN LEAD (Sales Department Only)
  */
