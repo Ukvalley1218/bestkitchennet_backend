@@ -1,55 +1,18 @@
 import mongoose from "mongoose";
 
-const callLogSchema = new mongoose.Schema(
+const retryQueueSchema = new mongoose.Schema(
   {
-    tenantId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Tenant",
-      required: true,
-      index: true,
-    },
+    tenantId: { type: mongoose.Schema.Types.ObjectId, ref: "Tenant", required: true },
 
-    leadId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Lead",
-      required: true,
-    },
+    leadId: { type: mongoose.Schema.Types.ObjectId, ref: "Lead", required: true },
 
-    employeeId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+    employeeId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-    callType: {
-      type: String,
-      enum: ["inbound", "outbound"],
-      required: true,
-    },
+    retryCount: { type: Number, default: 1 },
 
-    status: {
-      type: String,
-      enum: ["answered", "missed", "rejected"],
-    },
-
-    outcome: {
-      type: String,
-      enum: ["interested", "followup", "not_interested", "not_reachable"],
-    },
-
-    duration: Number,
-
-    isLive: {
-      type: Boolean,
-      default: false,
-    },
-
-    startedAt: Date,
-    endedAt: Date,
-
-    recordingUrl: String,
+    nextRetryAt: Date,
   },
   { timestamps: true }
 );
 
-export default mongoose.model("CallLog", callLogSchema);
+export default mongoose.model("RetryQueue", retryQueueSchema);

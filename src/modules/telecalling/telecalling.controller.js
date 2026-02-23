@@ -4,6 +4,8 @@ import CallLog from "./callLog.model.js";
 import RetryQueue from "./retryQueue.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import ActivityLog from "./activityLog.model.js";
+
 
 
 
@@ -144,6 +146,11 @@ export const startCall = async (req, res, next) => {
       startedAt: new Date(),
     });
 
+    await Lead.findByIdAndUpdate(req.body.leadId, {
+      $inc: { callAttempted: 1 },
+      lastCallAt: new Date(),
+    });
+
     res.json({ success: true, data: call });
   } catch (err) {
     next(err);
@@ -165,12 +172,16 @@ export const endCall = async (req, res, next) => {
         endedAt: new Date(),
         duration: req.body.duration,
         status: req.body.status,
-        outcome: req.body.outcome,
+        wasConnected: req.body.wasConnected,
       },
       { new: true }
     );
 
-    await handleOutcome(call, req.user);
+    if (req.body.wasConnected) {
+      await Lead.findByIdAndUpdate(call.leadId, {
+        $inc: { callConnected: 1 },
+      });
+    }
 
     res.json({ success: true, data: call });
   } catch (err) {
@@ -178,41 +189,111 @@ export const endCall = async (req, res, next) => {
   }
 };
 
-/**
- * OUTCOME ENGINE
- */
-const handleOutcome = async (call, user) => {
-  const lead = await Lead.findById(call.leadId);
+// dispose lead after call
+export const disposeLead = async (req, res, next) => {
+  try {
+    const {
+      leadId,
+      callId,
+      wasConnected,
+      reason,
+      stage,
+      nextAction,
+      disposeRemark,
+    } = req.body;
 
-  if (!lead) return;
+    const lead = await Lead.findOne({
+      _id: leadId,
+      assignedTo: req.user.id,
+      tenantId: req.user.tenantId,
+    });
 
-  switch (call.outcome) {
-    case "interested":
-      lead.leadStage = "interested";
-      break;
+    if (!lead) {
+      return res.status(404).json({ success: false });
+    }
 
-    case "followup":
-      lead.leadStage = "followup";
-      lead.followUpDate = new Date();
-      break;
+    // Update CallLog
+    await CallLog.findByIdAndUpdate(callId, {
+      wasConnected,
+      reason,
+      outcome: stage,
+    });
 
-    case "not_reachable":
+    // Update Lead
+    lead.disposeRemark = disposeRemark;
+
+    if (!wasConnected) {
       lead.leadStage = "retry";
+
       await RetryQueue.create({
-        tenantId: user.tenantId,
+        tenantId: req.user.tenantId,
         leadId: lead._id,
-        employeeId: user.id,
+        employeeId: req.user.id,
         nextRetryAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
-      break;
+    } else {
+      lead.leadStage = stage?.toLowerCase();
+    }
 
-    case "not_interested":
-      lead.leadStage = "closed";
-      break;
+    if (nextAction?.followUpDate) {
+      lead.followUpDate = nextAction.followUpDate;
+      lead.leadStage = "followup";
+    }
+
+    if (nextAction?.reassignTo) {
+      lead.assignedTo = nextAction.reassignTo;
+    }
+
+    await lead.save();
+
+    res.json({ success: true, data: lead });
+  } catch (err) {
+    next(err);
   }
-
-  await lead.save();
 };
+
+export const getMyReport = async (req, res, next) => {
+  try {
+    const start = new Date(req.query.date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setHours(23, 59, 59, 999);
+
+    const calls = await CallLog.find({
+      employeeId: req.user.id,
+      tenantId: req.user.tenantId,
+      createdAt: { $gte: start, $lte: end },
+    });
+
+    const activity = await ActivityLog.find({
+      employeeId: req.user.id,
+      tenantId: req.user.tenantId,
+      createdAt: { $gte: start, $lte: end },
+    });
+
+    const callAttempted = calls.length;
+    const callConnected = calls.filter(c => c.wasConnected).length;
+    const notConnected = callAttempted - callConnected;
+
+    const totalCallTime = calls.reduce((sum, c) => sum + (c.duration || 0), 0);
+
+    res.json({
+      success: true,
+      data: {
+        callAttempted,
+        callConnected,
+        notConnected,
+        totalCallTime,
+        totalBreaks: activity.filter(a => a.type === "break").length,
+        activityLogs: activity,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 export const updateMyLead = async (req, res, next) => {
   try {
@@ -330,4 +411,51 @@ export const getLeadDetails = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+
+// shift tracking apis , to know when employee is on call and when not, to show live status on dashboard and for managers to track their team
+// start call
+export const startShift = async (req, res, next) => {
+  const log = await ActivityLog.create({
+    tenantId: req.user.tenantId,
+    employeeId: req.user.id,
+    type: "start",
+    description: "Shift started",
+  });
+
+  res.json({ success: true, data: log });
+};
+// take a brak
+export const takeBreak = async (req, res, next) => {
+  const log = await ActivityLog.create({
+    tenantId: req.user.tenantId,
+    employeeId: req.user.id,
+    type: "break",
+    description: req.body.reason,
+  });
+
+  res.json({ success: true, data: log });
+};
+
+// resume work
+export const resumeWork = async (req, res, next) => {
+  const log = await ActivityLog.create({
+    tenantId: req.user.tenantId,
+    employeeId: req.user.id,
+    type: "resume",
+  });
+
+  res.json({ success: true, data: log });
+};
+
+// logout
+export const logoutShift = async (req, res, next) => {
+  const log = await ActivityLog.create({
+    tenantId: req.user.tenantId,
+    employeeId: req.user.id,
+    type: "logout",
+  });
+
+  res.json({ success: true, data: log });
 };
