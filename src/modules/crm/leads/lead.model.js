@@ -24,6 +24,7 @@ const leadSchema = new mongoose.Schema(
       enum: ["hot", "warm", "cold"],
       default: "warm",
     },
+    remarks: String,
 
     status: {
       type: String,

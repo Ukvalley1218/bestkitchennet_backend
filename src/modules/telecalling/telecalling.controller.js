@@ -25,7 +25,7 @@ export const login = async (req, res, next) => {
             tenantId: user.tenantId,
           },
           process.env.JWT_SECRET,
-          { expiresIn: "7d" }
+          { expiresIn: "30d" }
         );
 
     res.json({ msg:"Login Successful",success: true, token });
