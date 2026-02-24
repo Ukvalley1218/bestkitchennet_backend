@@ -57,6 +57,10 @@ leadStage: {
       ref: "User",
       required: true,
     },
+    dealValue: {
+  type: Number,
+  default: 0
+},
 
     isDeleted: {
       type: Boolean,

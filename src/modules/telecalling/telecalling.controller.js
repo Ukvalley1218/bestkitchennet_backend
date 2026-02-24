@@ -43,45 +43,209 @@ export const login = async (req, res, next) => {
  * SUMMARY
  */
 export const summary = async (req, res, next) => {
-  try {
+ try {
     const tenantId = req.user.tenantId;
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    /* ===============================
+       LEADS STATS
+    =============================== */
+
+    const totalLeads = await Lead.countDocuments({
+      tenantId,
+      isDeleted: false,
+    });
+
+    const unassignedLeads = await Lead.countDocuments({
+      tenantId,
+      assignedTo: null,
+      isDeleted: false,
+    });
+
+    const hotLeads = await Lead.countDocuments({
+      tenantId,
+      leadType: "hot",
+      isDeleted: false,
+    });
+
+    const warmLeads = await Lead.countDocuments({
+      tenantId,
+      leadType: "warm",
+      isDeleted: false,
+    });
+
+    const coldLeads = await Lead.countDocuments({
+      tenantId,
+      leadType: "cold",
+      isDeleted: false,
+    });
+
+    const convertedSales = await Lead.countDocuments({
+      tenantId,
+      status: "closed-won",
+      isDeleted: false,
+    });
+
+    const followUpsPending = await Lead.countDocuments({
+      tenantId,
+      leadStage: "followup",
+      nextFollowUpDate: { $lte: new Date() },
+      isDeleted: false,
+    });
+
+    /* ===============================
+       REVENUE (from closed-won leads)
+       Assuming you store dealValue in Lead
+    =============================== */
+
+    const revenueAgg = await Lead.aggregate([
+      {
+        $match: {
+          tenantId,
+          status: "closed-won",
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$dealValue" },
+        },
+      },
+    ]);
+
+    const revenue = revenueAgg[0]?.totalRevenue || 0;
+
+    /* ===============================
+       EMPLOYEE STATS
+    =============================== */
 
     const totalEmployees = await User.countDocuments({
       tenantId,
       department: "Sales",
+      status: "active",
     });
 
-    const onCall = await CallLog.countDocuments({
+    const activeToday = await CallLog.distinct("employeeId", {
+      tenantId,
+      createdAt: { $gte: startOfDay },
+    });
+
+    const onCallNow = await CallLog.countDocuments({
       tenantId,
       isLive: true,
     });
 
-    const activeEmployees = await CallLog.distinct("employeeId", {
+    /* ===============================
+       CALL STATS
+    =============================== */
+
+    const totalCallsToday = await CallLog.countDocuments({
       tenantId,
-      createdAt: {
-        $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-      },
+      createdAt: { $gte: startOfDay },
     });
 
-    const avgDuration = await CallLog.aggregate([
-      { $match: { tenantId } },
-      { $group: { _id: null, avg: { $avg: "$duration" } } },
+    const avgCallDurationAgg = await CallLog.aggregate([
+      {
+        $match: {
+          tenantId,
+          createdAt: { $gte: startOfDay },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          avgDuration: { $avg: "$duration" },
+        },
+      },
     ]);
+
+    const avgCallDuration =
+      avgCallDurationAgg[0]?.avgDuration || 0;
+
+    const recordingsCount = await CallLog.countDocuments({
+      tenantId,
+      recordingUrl: { $exists: true, $ne: null },
+    });
+
+    /* ===============================
+       AVG PERFORMANCE
+       (Calls per active employee today)
+    =============================== */
+
+    const avgPerformance =
+      activeToday.length > 0
+        ? totalCallsToday / activeToday.length
+        : 0;
+
+    /* ===============================
+       LIVE ONGOING CALLS DATA
+    =============================== */
+
+    const liveOngoingCalls = await CallLog.find({
+      tenantId,
+      isLive: true,
+    })
+      .populate("employeeId", "name email")
+      .populate("leadId", "name phone")
+      .sort({ startedAt: -1 });
+
+    /* ===============================
+       RECENT COMPLETED CALLS
+    =============================== */
+
+    const recentCompletedCalls = await CallLog.find({
+      tenantId,
+      isLive: false,
+      endedAt: { $ne: null },
+    })
+      .populate("employeeId", "name")
+      .populate("leadId", "name phone")
+      .sort({ endedAt: -1 })
+      .limit(10);
+
+    /* ===============================
+       FINAL RESPONSE
+    =============================== */
 
     res.json({
       success: true,
       data: {
-        totalEmployees,
-        onCall,
-        activeEmployees: activeEmployees.length,
-        avgCallDuration: avgDuration[0]?.avg || 0,
+        leads: {
+          totalLeads,
+          unassignedLeads,
+          hotLeads,
+          warmLeads,
+          coldLeads,
+          convertedSales,
+          followUpsPending,
+        },
+
+        revenue,
+
+        employees: {
+          totalEmployees,
+          activeToday: activeToday.length,
+          onCallNow,
+        },
+
+        calls: {
+          totalCallsToday,
+          avgCallDuration,
+          avgPerformance,
+          recordingsCount,
+        },
+
+        liveOngoingCalls,
+        recentCompletedCalls,
       },
     });
   } catch (err) {
     next(err);
   }
 };
-
 /**
  * LIVE CALLS
  */
