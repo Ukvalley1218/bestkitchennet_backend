@@ -13,7 +13,7 @@ router.post(
   "/",
   auth,
   tenantMiddleware,
-  rbac(["super_admin", "admin", "manager"]),
+  rbac(["super_admin", "admin", "manager", "sales"]),
   createCustomer
 );
 

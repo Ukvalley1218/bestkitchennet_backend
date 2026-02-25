@@ -14,6 +14,8 @@ import dashboardRoutes from './modules/crm/dashboard/dashboard.routes.js';
 import telecallingRoutes from "./modules/telecalling/telecalling.routes.js";
 import campaignRoutes from "./modules/marketing/campaign.routes.js";
 import marketingDashboardRoutes from "./modules/marketing/dashboard.routes.js";
+import salesRoutes from "./modules/sales/sale.routes.js";
+import salesDashboardRoutes from "./modules/sales/dashboard.routes.js";
 
 const app = express();
 
@@ -37,6 +39,10 @@ app.use("/api/marketing/dashboard", marketingDashboardRoutes);
 
 // Telecalling routes
 app.use("/api/telecalling", telecallingRoutes);
+
+// Sales routes
+app.use("/api/sales", salesRoutes);
+app.use("/api/sales/dashboard", salesDashboardRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
