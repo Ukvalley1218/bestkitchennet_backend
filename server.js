@@ -14,6 +14,7 @@ import quotationRoutes  from './src/modules/crm/quotations/quotation.routes.js';
 import invoiceRoutes  from './src/modules/crm/invoices/invoice.routes.js';
 import dashboardRoutes  from './src/modules/crm/dashboard/dashboard.routes.js';
 import telecallingRoutes from "./src/modules/telecalling/telecalling.routes.js";
+import interiorRoutes from "./src/modules/interior/interior.routes.js";
 
 
 dotenv.config();
@@ -39,6 +40,7 @@ app.use("/api/crm/dashboard",dashboardRoutes);
 
 // router
 app.use("/api/telecalling",telecallingRoutes);
+app.use("/api/interior",interiorRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
