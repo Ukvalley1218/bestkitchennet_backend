@@ -24,6 +24,7 @@ import {
   spaceTypeDistribution,
   topPerformingModels,
 } from "./interior.controller.js";
+import { upload } from "../../middlewares/upload.middleware.js";
 
 const router = Router();
 
@@ -41,6 +42,7 @@ router.post(
   auth,
   tenant,
   rbac(["super_admin", "admin", "ceo", "manager", "employee"]),
+  upload.array("files", 10),
   createModel
 );
 

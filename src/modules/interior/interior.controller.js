@@ -1,13 +1,48 @@
 import InteriorModel from "./interior.model.js";
 import ClientModel from "./clientModel.model.js";
+import { uploadToCloudinary } from "../../services/cloudinary.service.js";
+import { generateFolderPath } from "../../utils/fileFolder.util.js";
+import { deleteFromCloudinary } from "../../services/cloudinary.service.js";
 
 /**
  * CREATE MODEL
  */
+/**
+ * CREATE MODEL WITH FILES
+ */
 export const createModel = async (req, res, next) => {
   try {
+    const filesData = [];
+
+    // you also use this logic in other places where you upload files, so can be moved to a service function
+    if (req.files && req.files.length > 0) {
+      const folder = generateFolderPath({
+        tenantId: req.user.tenantId,
+        moduleName: "interior",  //change as per module eg "crm/leads" for leads module
+        subFolder: "models",   //change this one too
+      });
+
+      for (const file of req.files) {
+        const result = await uploadToCloudinary(
+          file.buffer,
+          folder,
+          file.mimetype.startsWith("video") ? "video" : "image"
+        );
+
+        filesData.push({
+          public_id: result.public_id,
+          secure_url: result.secure_url,
+          format: result.format,
+          size: result.bytes,
+          original_filename: file.originalname,
+          resource_type: result.resource_type,
+        });
+      }
+    }
+
     const model = await InteriorModel.create({
       ...req.body,
+      files: filesData,
       tenantId: req.user.tenantId,
       createdBy: req.user.id,
     });
@@ -183,9 +218,17 @@ export const deleteModel = async (req, res, next) => {
       });
     }
 
+    // delete model 
     await InteriorModel.findByIdAndUpdate(req.params.id, {
       $set: { isDeleted: true },
     });
+
+    // delete files from cloudinary
+    await Promise.all(
+  model.files.map((file) =>
+    deleteFromCloudinary(file.public_id)
+  )
+);
 
     res.json({
       success: true,
